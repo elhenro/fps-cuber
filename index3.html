@@ -14,7 +14,7 @@ body {
     </style>
   </head>
   <body>
-    <div id="red-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: red; opacity: 0; pointer-events: none;"></div>
+    <div id="red-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: red; opacity: 0; pointer-events: none;  z-index: 1;"></div>
     <div id="game-over" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
       <h1>Game Over</h1>
       <button id="restart-button">Restart</button>
@@ -132,14 +132,6 @@ function init() {
 
   window.addEventListener('resize', onWindowResize);
 
-  /*
-  playerBody.addEventListener('collide', (e) => {
-    const contact = e.contact;
-    if (contact.ni.y > 0.5) { // Top of the cube was hit
-      moveUp = false;
-    }
-  });
- */
   playerBody.addEventListener('collide', (e) => {
     const contact = e.contact;
     const cube = cubes.find((cubeObj) => cubeObj.body.id === e.body.id);
@@ -158,7 +150,9 @@ function init() {
       }
     }
   });
-
+  scoreText = createText('Score: 0', scoreTextSize, 0xffffff);
+  scoreText.position.set(0, 20, -30);
+  scene.add(scoreText);
 }
 
 function onKeyDown(event) {
@@ -438,10 +432,12 @@ function animate() {
   world.step(1 / 60);
   controls.getObject().position.copy(playerBody.position);
 
+  /*
   cubes.forEach((cubeObj) => {
     cubeObj.mesh.position.copy(cubeObj.body.position);
     cubeObj.mesh.quaternion.copy(cubeObj.body.quaternion);
   });
+  */
 
    bullets.forEach((bulletObj) => {
     bulletObj.mesh.position.copy(bulletObj.body.position);
@@ -449,10 +445,18 @@ function animate() {
   });
 
   randomCubeManagement()
-  cubes.forEach((cubeObj) => {
-    const direction = controls.getObject().position.clone().sub(cubeObj.mesh.position).normalize();
-    cubeObj.body.velocity.set(direction.x * 0.5, cubeObj.body.velocity.y, direction.z * 0.5);
+  /*
+  cubes.forEach((cube) => {
+    const direction = controls.getObject().position.clone().sub(cube.mesh.position);
+    console.log({ direction })
+    const distance = direction.length();
+
+    if (distance < 50) {
+      direction.normalize();
+      cube.body.applyForce(direction.scale(10), cube.body.position);
+    }
   });
+ */
 
   renderer.render(scene, camera);
 }

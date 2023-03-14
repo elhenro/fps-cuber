@@ -433,31 +433,27 @@ function animate() {
       playerBody.velocity.x -= sideDirection.x * speed;
       playerBody.velocity.z -= sideDirection.z * speed;
     }
+    playerBody.velocity.y = velocityY;
+
   }
 
-  world.step(1 / 60);
   controls.getObject().position.copy(playerBody.position);
+world.step(1 / 60);
 
-  cubes.forEach((cubeObj) => {
-    cubeObj.mesh.position.copy(cubeObj.body.position);
-    cubeObj.mesh.quaternion.copy(cubeObj.body.quaternion);
-  });
-
-   bullets.forEach((bulletObj) => {
-    bulletObj.mesh.position.copy(bulletObj.body.position);
-    bulletObj.mesh.quaternion.copy(bulletObj.body.quaternion);
-  });
-
-  randomCubeManagement()
-  cubes.forEach((cubeObj) => {
-    const direction = controls.getObject().position.clone().sub(cubeObj.mesh.position).normalize();
-    cubeObj.body.velocity.set(direction.x * 0.5, cubeObj.body.velocity.y, direction.z * 0.5);
-  });
-
-  renderer.render(scene, camera);
+for (let i = 0; i < cubes.length; i++) {
+cubes[i].mesh.position.copy(cubes[i].body.position);
+cubes[i].mesh.quaternion.copy(cubes[i].body.quaternion);
 }
-    </script>
-    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "585eb0aa0faa47d9b34cb34b0c9adbfe"}'></script>
+
+for (let i = 0; i < bullets.length; i++) {
+bullets[i].mesh.position.copy(bullets[i].body.position);
+bullets[i].mesh.quaternion.copy(bullets[i].body.quaternion);
+}
+
+randomCubeManagement();
+renderer.render(scene, camera);
+}
+</script>
+
   </body>
 </html>
-
