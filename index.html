@@ -35,6 +35,11 @@ let playerBody;
 let bullets = [];
 const PLAYER_GROUP = 1 << 0;
 const BULLET_GROUP = 1 << 1;
+const GROUND_GROUP = 1 << 2;
+const groundFilter = {
+  collisionFilterGroup: GROUND_GROUP,
+  collisionFilterMask: ~GROUND_GROUP
+};
 const playerFilter = {
   collisionFilterGroup: PLAYER_GROUP,
   collisionFilterMask: ~PLAYER_GROUP | GROUND_GROUP
@@ -43,11 +48,6 @@ const playerFilter = {
 const bulletFilter = {
   collisionFilterGroup: BULLET_GROUP,
   collisionFilterMask: ~BULLET_GROUP | GROUND_GROUP
-};
-const GROUND_GROUP = 1 << 2;
-const groundFilter = {
-  collisionFilterGroup: GROUND_GROUP,
-  collisionFilterMask: ~GROUND_GROUP
 };
 
 init();
@@ -188,13 +188,14 @@ function randomCubeManagement() {
   if (Math.random() < 0.05) {
     const cube = createRandomCube();
     scene.add(cube);
-
+    /*
     setTimeout(() => {
       scene.remove(cube);
       cubes = cubes.filter((c) => c !== cube);
       cube.geometry.dispose();
       cube.material.dispose();
     }, Math.random() * 5000 + 2000);
+   */
   }
 }
 
