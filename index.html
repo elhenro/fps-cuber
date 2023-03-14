@@ -16,6 +16,7 @@ body {
   <body>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://rawcdn.githack.com/mrdoob/three.js/r128/examples/js/controls/PointerLockControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js" integrity="sha512-avLcnGxl5mqAX/wIKERdb1gFNkOLHh2W5JNCfJm5OugpEPBz7LNXJJ3BDjjwO00AxEY1MqdNjtEmiYhKC0ld7g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script>
 let camera, scene, renderer, controls;
 let moveForward = false;
@@ -30,6 +31,10 @@ const jumpSpeed = 2;
 let cubes = [];
 const playerBox = new THREE.Box3();
 
+let world;
+let playerBody;
+let bullets = [];
+
 init();
 animate();
 
@@ -42,6 +47,20 @@ function init() {
   let light = new THREE.PointLight(0xffffff, 1);
   camera.add(light);
   scene.add(camera);
+
+  world = new CANNON.World();
+  world.gravity.set(0, gravity, 0);
+  world.broadphase = new CANNON.NaiveBroadphase();
+  world.solver.iterations = 10;
+
+  createGround();
+
+  playerBody = new CANNON.Body({
+    mass: 5,
+    position: new CANNON.Vec3(0, 1.8, 0),
+    shape: new CANNON.Box(new CANNON.Vec3(0.5, 0.9, 0.5))
+  });
+  world.addBody(playerBody);
 
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -57,6 +76,13 @@ function init() {
   document.addEventListener('keyup', onKeyUp);
 
   window.addEventListener('resize', onWindowResize);
+
+  playerBody.addEventListener('collide', (e) => {
+    const contact = e.contact;
+    if (contact.ni.y > 0.5) { // Top of the cube was hit
+      moveUp = false;
+    }
+  });
 }
 
 function onKeyDown(event) {
@@ -130,7 +156,15 @@ function createRandomCube() {
     (Math.random() - 0.5) * 100
   );
 
-  cubes.push(cube);
+  // cubes.push(cube);
+  const cubeShape = new CANNON.Box(new CANNON.Vec3(size / 2, size / 2, size / 2));
+  const cubeBody = new CANNON.Body({
+    mass: 0,
+    shape: cubeShape,
+    position: new CANNON.Vec3(cube.position.x, cube.position.y, cube.position.z)
+  });
+  world.addBody(cubeBody);
+  cubes.push({ mesh: cube, body: cubeBody });
   return cube;
 }
 
@@ -150,6 +184,7 @@ function randomCubeManagement() {
 
 randomCubeManagement();
 
+/*
 function detectCollision(positionChange) {
   const newPosition = controls.getObject().position.clone().add(positionChange);
   const smallerPlayerBoxSize = new THREE.Vector3(0.45, 1.75, 0.45);
@@ -175,7 +210,57 @@ function detectCollision(positionChange) {
 
   return false;
 }
+*/
 
+function createGround() {
+  const groundShape = new CANNON.Plane();
+  const groundBody = new CANNON.Body({ mass: 0, shape: groundShape });
+  groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+  world.addBody(groundBody);
+}
+
+function shoot() {
+  const radius = 0.1;
+  const speed = 50;
+  const bulletGeometry = new THREE.SphereGeometry(radius);
+  const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+  bullet.position.copy(controls.getObject().position);
+  scene.add(bullet);
+
+  const bulletShape = new CANNON.Sphere(radius);
+  const bulletBody = new CANNON.Body({
+    mass: 1,
+    shape: bulletShape,
+    position: new CANNON.Vec3(bullet.position.x, bullet.position.y, bullet.position.z)
+  });
+  const direction = controls.getDirection(new THREE.Vector3()).normalize();
+  bulletBody.velocity.set(direction.x * speed, direction.y * speed, direction.z * speed);
+  world.addBody(bulletBody);
+  bullets.push({ mesh: bullet, body: bulletBody });
+
+  bulletBody.addEventListener('collide', (e) => {
+    const cube = cubes.find((cubeObj) => cubeObj.body.id === e.body.id);
+    if (cube) {
+      scene.remove(cube.mesh);
+      world.remove(cube.body);
+      cubes = cubes.filter((c) => c !== cube);
+      cube.mesh.geometry.dispose();
+      cube.mesh.material.dispose();
+    }
+    scene.remove(bullet);
+    world.remove(bulletBody);
+    bullets = bullets.filter((b) => b !== bullet);
+    bullet.geometry.dispose();
+    bullet.material.dispose();
+  });
+}
+
+document.addEventListener('mousedown', (e) => {
+  if (e.button === 0 && controls.isLocked) {
+    shoot();
+  }
+});
 
 function animate() {
   requestAnimationFrame(animate);
@@ -201,6 +286,7 @@ function animate() {
   const verticalChange = new THREE.Vector3(0, velocityY, 0);
 
   // Check for vertical collisions separately
+  /*
   if (!detectCollision(verticalChange)) {
     controls.getObject().position.y += velocityY;
   } else {
@@ -214,7 +300,19 @@ function animate() {
     controls.moveRight(velocity.x);
     controls.moveForward(velocity.z);
   }
+  */
+  world.step(1 / 60);
+  controls.getObject().position.copy(playerBody.position);
 
+  cubes.forEach((cubeObj) => {
+    cubeObj.mesh.position.copy(cubeObj.body.position);
+    cubeObj.mesh.quaternion.copy(cubeObj.body.quaternion);
+  });
+
+   bullets.forEach((bulletObj) => {
+    bulletObj.mesh.position.copy(bulletObj.body.position);
+    bulletObj.mesh.quaternion.copy(bulletObj.body.quaternion);
+  });
 
   randomCubeManagement()
   renderer.render(scene, camera);
