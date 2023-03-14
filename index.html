@@ -25,8 +25,10 @@ let moveLeft = false;
 let moveRight = false;
 let moveUp = true;
 let velocityY = 0;
-const gravity = -0.15;
-const jumpSpeed = 2;
+
+const gravity = -9.81;
+const jumpSpeed = 5;
+const speed = 4;
 
 let cubes = [];
 const playerBox = new THREE.Box3();
@@ -102,7 +104,7 @@ function onKeyDown(event) {
     case 'Space':
       if (!moveUp && controls.getObject().position.y <= 1.8) {
       moveUp = true;
-      velocityY = jumpSpeed;
+      playerBody.applyImpulse(new CANNON.Vec3(0, jumpSpeed * playerBody.mass, 0), playerBody.position);
     }
     break;
   }
@@ -267,11 +269,11 @@ function animate() {
 
   let velocity = new THREE.Vector3();
   let direction = new THREE.Vector3();
-  let speed = 0.1;
+  // let speed = 0.1;
   if (moveBackward) velocity.z -= speed;
   if (moveForward) velocity.z += speed;
-  if (moveLeft) velocity.x -= speed;
-  if (moveRight) velocity.x += speed;
+  if (moveRight) velocity.x -= speed;
+  if (moveLeft) velocity.x += speed;
 
   if (moveUp) {
     velocityY += gravity;
@@ -285,22 +287,31 @@ function animate() {
   const positionChange = new THREE.Vector3(velocity.x, velocityY, velocity.z);
   const verticalChange = new THREE.Vector3(0, velocityY, 0);
 
-  // Check for vertical collisions separately
-  /*
-  if (!detectCollision(verticalChange)) {
-    controls.getObject().position.y += velocityY;
-  } else {
-    // Ensure the player is on the ground when a vertical collision occurs
-    controls.getObject().position.y = Math.ceil(controls.getObject().position.y / 2) * 2 - 1.8;
-    moveUp = false;
+  if (controls.isLocked) {
+    const playerDirection = controls.getDirection(direction).normalize();
+    const sideDirection = new THREE.Vector3(-playerDirection.z, 0, playerDirection.x).normalize();
+
+    playerBody.velocity.x = 0;
+    playerBody.velocity.z = 0;
+    
+    if (moveForward) {
+      playerBody.velocity.x += playerDirection.x * speed;
+      playerBody.velocity.z += playerDirection.z * speed;
+    }
+    if (moveBackward) {
+      playerBody.velocity.x -= playerDirection.x * speed;
+      playerBody.velocity.z -= playerDirection.z * speed;
+    }
+    if (moveRight) {
+      playerBody.velocity.x += sideDirection.x * speed;
+      playerBody.velocity.z += sideDirection.z * speed;
+    }
+    if (moveLeft) {
+      playerBody.velocity.x -= sideDirection.x * speed;
+      playerBody.velocity.z -= sideDirection.z * speed;
+    }
   }
 
-  // Check for horizontal collisions
-  if (!detectCollision(positionChange)) {
-    controls.moveRight(velocity.x);
-    controls.moveForward(velocity.z);
-  }
-  */
   world.step(1 / 60);
   controls.getObject().position.copy(playerBody.position);
 
