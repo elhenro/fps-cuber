@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Random Cuber</title>
+    <style>
+body {
+  margin: 0;
+}
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://rawcdn.githack.com/mrdoob/three.js/r128/examples/js/controls/PointerLockControls.js"></script>
+    <script>
+let camera, scene, renderer, controls;
+let moveForward = false;
+let moveBackward = false;
+let moveLeft = false;
+let moveRight = false;
+let moveUp = true;
+let velocityY = 0;
+const gravity = -0.5;
+const jumpSpeed = 4;
+
+init();
+animate();
+
+function init() {
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xffffff);
+  scene.add(new THREE.GridHelper(100, 100));
+
+  let light = new THREE.PointLight(0xffffff, 1);
+  camera.add(light);
+  scene.add(camera);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  controls = new THREE.PointerLockControls(camera, renderer.domElement);
+  document.addEventListener('click', () => controls.lock());
+  controls.addEventListener('lock', onPointerLockChange);
+  controls.addEventListener('unlock', onPointerLockChange);
+
+  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('keyup', onKeyUp);
+
+  window.addEventListener('resize', onWindowResize);
+}
+
+function onKeyDown(event) {
+  switch (event.code) {
+    case 'KeyW':
+      moveForward = true;
+    break;
+    case 'KeyS':
+      moveBackward = true;
+    break;
+    case 'KeyA':
+      moveLeft = true;
+    break;
+    case 'KeyD':
+      moveRight = true;
+    break;
+    case 'Space':
+      if (!moveUp) {
+      moveUp = true;
+      velocityY = jumpSpeed;
+    }
+    break;
+  }
+}
+
+function onKeyUp(event) {
+  switch (event.code) {
+    case 'KeyW':
+      moveForward = false;
+    break;
+    case 'KeyS':
+      moveBackward = false;
+    break;
+    case 'KeyA':
+      moveLeft = false;
+    break;
+    case 'KeyD':
+      moveRight = false;
+    break;
+    case 'Space':
+      moveUp = false;
+    break;
+  }
+}
+
+function onPointerLockChange() {
+  if (controls.isLocked) {
+    controls.enabled = true;
+  } else {
+    controls.enabled = false;
+  }
+  moveUp = false
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function createRandomCube() {
+  const size = Math.random() * 2;
+  const geometry = new THREE.BoxGeometry(size, size, size);
+  const color = new THREE.Color(Math.random(), Math.random(), Math.random());
+  const material = new THREE.MeshLambertMaterial({ color });
+  const cube = new THREE.Mesh(geometry, material);
+
+  cube.position.set(
+    (Math.random() - 0.5) * 100,
+    size / 2,
+    (Math.random() - 0.5) * 100
+  );
+
+  return cube;
+}
+
+function randomCubeManagement() {
+  if (Math.random() < 0.05) {
+    const cube = createRandomCube();
+    scene.add(cube);
+
+    setTimeout(() => {
+      scene.remove(cube);
+      cube.geometry.dispose();
+      cube.material.dispose();
+    }, Math.random() * 5000 + 2000);
+  }
+}
+
+randomCubeManagement();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  let velocity = new THREE.Vector3();
+  let direction = new THREE.Vector3();
+  let speed = 0.1;
+  if (moveBackward) velocity.z -= speed;
+  if (moveForward) velocity.z += speed;
+  if (moveLeft) velocity.x -= speed;
+  if (moveRight) velocity.x += speed;
+
+  controls.moveRight(velocity.x);
+  controls.moveForward(velocity.z);
+
+  if (moveUp) {
+    velocityY += gravity;
+    controls.getObject().position.y += velocityY;
+
+    if (controls.getObject().position.y < 1.8) {
+      velocityY = 0;
+      moveUp = false;
+      controls.getObject().position.y = 1.8;
+    }
+  }
+  randomCubeManagement()
+  renderer.render(scene, camera);
+}
+    </script>
+  </body>
+</html>
+
