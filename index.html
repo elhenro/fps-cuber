@@ -24,8 +24,11 @@ let moveLeft = false;
 let moveRight = false;
 let moveUp = true;
 let velocityY = 0;
-const gravity = -0.5;
-const jumpSpeed = 4;
+const gravity = -0.15;
+const jumpSpeed = 2;
+
+let cubes = [];
+const playerBox = new THREE.Box3();
 
 init();
 animate();
@@ -48,6 +51,7 @@ function init() {
   document.addEventListener('click', () => controls.lock());
   controls.addEventListener('lock', onPointerLockChange);
   controls.addEventListener('unlock', onPointerLockChange);
+  controls.getObject().position.set(0, 1.8, 0);
 
   document.addEventListener('keydown', onKeyDown);
   document.addEventListener('keyup', onKeyUp);
@@ -70,7 +74,7 @@ function onKeyDown(event) {
       moveRight = true;
     break;
     case 'Space':
-      if (!moveUp) {
+      if (!moveUp && controls.getObject().position.y <= 1.8) {
       moveUp = true;
       velocityY = jumpSpeed;
     }
@@ -126,6 +130,7 @@ function createRandomCube() {
     (Math.random() - 0.5) * 100
   );
 
+  cubes.push(cube);
   return cube;
 }
 
@@ -136,6 +141,7 @@ function randomCubeManagement() {
 
     setTimeout(() => {
       scene.remove(cube);
+      cubes = cubes.filter((c) => c !== cube);
       cube.geometry.dispose();
       cube.material.dispose();
     }, Math.random() * 5000 + 2000);
@@ -143,6 +149,33 @@ function randomCubeManagement() {
 }
 
 randomCubeManagement();
+
+function detectCollision(positionChange) {
+  const newPosition = controls.getObject().position.clone().add(positionChange);
+  const smallerPlayerBoxSize = new THREE.Vector3(0.45, 1.75, 0.45);
+  playerBox.setFromCenterAndSize(newPosition, smallerPlayerBoxSize);
+
+  for (let cube of cubes) {
+    const cubeBox = new THREE.Box3().setFromObject(cube);
+
+    if (playerBox.intersectsBox(cubeBox)) {
+      const playerBottom = playerBox.min.y;
+      const cubeTop = cubeBox.max.y;
+
+      if (positionChange.y < 0 && playerBottom >= cubeTop) {
+        // Allow landing on top of the cube
+        controls.getObject().position.y = cubeTop + 1.8;
+        return false;
+      } else {
+        // Block movement for side collisions
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 
 function animate() {
   requestAnimationFrame(animate);
@@ -155,19 +188,34 @@ function animate() {
   if (moveLeft) velocity.x -= speed;
   if (moveRight) velocity.x += speed;
 
-  controls.moveRight(velocity.x);
-  controls.moveForward(velocity.z);
-
   if (moveUp) {
     velocityY += gravity;
-    controls.getObject().position.y += velocityY;
-
-    if (controls.getObject().position.y < 1.8) {
-      velocityY = 0;
-      moveUp = false;
-      controls.getObject().position.y = 1.8;
-    }
+  } else if (controls.getObject().position.y > 1.8) {
+    velocityY = Math.max(velocityY + gravity, -jumpSpeed);
+  } else {
+    velocityY = 0;
+    controls.getObject().position.y = 1.8; // Ensure the player stays on the ground
   }
+
+  const positionChange = new THREE.Vector3(velocity.x, velocityY, velocity.z);
+  const verticalChange = new THREE.Vector3(0, velocityY, 0);
+
+  // Check for vertical collisions separately
+  if (!detectCollision(verticalChange)) {
+    controls.getObject().position.y += velocityY;
+  } else {
+    // Ensure the player is on the ground when a vertical collision occurs
+    controls.getObject().position.y = Math.ceil(controls.getObject().position.y / 2) * 2 - 1.8;
+    moveUp = false;
+  }
+
+  // Check for horizontal collisions
+  if (!detectCollision(positionChange)) {
+    controls.moveRight(velocity.x);
+    controls.moveForward(velocity.z);
+  }
+
+
   randomCubeManagement()
   renderer.render(scene, camera);
 }
