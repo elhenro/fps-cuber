@@ -60,6 +60,8 @@
     let playerHealthPoints = 3
     let healthDisplay
 
+    let score = 0
+
     // collision groups
     const playerCollisionGroup = 1
     const bulletCollisionGroup = 2
@@ -69,6 +71,9 @@
     // bullets never collide with player
     playerBody.collisionFilterGroup = playerCollisionGroup
     playerBody.collisionFilterMask = ~bulletCollisionGroup
+
+    // sounds
+    const hitSound = new Audio('hit.mp3')
 
     init()
     animate()
@@ -132,10 +137,24 @@
       healthDisplay.style.fontSize = '20px'
       healthDisplay.style.zIndex = 100
       document.body.appendChild(healthDisplay)
+
+      scoreDisplay = document.createElement('div')
+      scoreDisplay.style.position = 'absolute'
+      scoreDisplay.style.top = '10px'
+      scoreDisplay.style.right = '10px'
+      scoreDisplay.style.color = 'white'
+      scoreDisplay.style.fontFamily = 'Arial, sans-serif'
+      scoreDisplay.style.fontSize = '20px'
+      scoreDisplay.style.zIndex = 100
+      document.body.appendChild(scoreDisplay)
     }
 
     function updateHealthDisplay() {
       healthDisplay.innerHTML = `HP: ${playerHealthPoints}`
+    }
+
+    function updateScoreDisplay() {
+      scoreDisplay.innerHTML = `Score: ${score}`
     }
 
     function onKeyDown(event) {
@@ -309,6 +328,9 @@
           worldObjects = worldObjects.filter((c) => c !== cube)
           cube.mesh.geometry.dispose()
           cube.mesh.material.dispose()
+          score += 1
+          updateScoreDisplay()
+          hitSound.play()
         }
         scene.remove(bullet)
         world.remove(bulletBody)
