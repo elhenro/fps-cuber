@@ -1,342 +1,388 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Random Cuber</title>
-    <style>
-      body {
-        margin: 0;
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Random Cuber</title>
+  <style>
+    body {
+      margin: 0;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://rawcdn.githack.com/mrdoob/three.js/r128/examples/js/controls/PointerLockControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"
+    integrity="sha512-avLcnGxl5mqAX/wIKERdb1gFNkOLHh2W5JNCfJm5OugpEPBz7LNXJJ3BDjjwO00AxEY1MqdNjtEmiYhKC0ld7g=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script>
+    let camera, scene, renderer, controls
+    let moveForward = false
+    let moveBackward = false
+    let moveLeft = false
+    let moveRight = false
+    let moveUp = true
+    let velocityY = 0
+
+    const gravity = -9.81
+    const jumpSpeed = 5
+    const speed = 4
+
+    let cubes = []
+    const playerBox = new THREE.Box3()
+
+    let world
+    let playerBody
+    let bullets = []
+    let playerHealthPoints = 3
+
+    init()
+    animate()
+
+    function init() {
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
+      scene = new THREE.Scene()
+      scene.background = new THREE.Color(0xffffff)
+      scene.add(new THREE.GridHelper(100, 100))
+
+      let light = new THREE.PointLight(0xffffff, 1)
+      camera.add(light)
+      scene.add(camera)
+
+      world = new CANNON.World()
+      world.gravity.set(0, gravity, 0)
+      world.broadphase = new CANNON.NaiveBroadphase()
+      world.solver.iterations = 10
+
+      createGround()
+
+      playerBody = new CANNON.Body({
+        mass: 5,
+        position: new CANNON.Vec3(0, 1.8, 0),
+        shape: new CANNON.Box(new CANNON.Vec3(0.5, 0.9, 0.5))
+      })
+      world.addBody(playerBody)
+
+      renderer = new THREE.WebGLRenderer({ antialias: true })
+      renderer.setSize(window.innerWidth, window.innerHeight)
+      document.body.appendChild(renderer.domElement)
+
+      controls = new THREE.PointerLockControls(camera, renderer.domElement)
+      document.addEventListener('click', () => controls.lock())
+      controls.addEventListener('lock', onPointerLockChange)
+      controls.addEventListener('unlock', onPointerLockChange)
+      controls.getObject().position.set(0, 1.8, 0)
+      document.addEventListener('keydown', onKeyDown)
+      document.addEventListener('keyup', onKeyUp)
+      window.addEventListener('resize', onWindowResize)
+
+      playerBody.addEventListener('collide', (e) => {
+        const contact = e.contact
+        const cube = cubes.find((cubeObj) => cubeObj.body.id === e.body.id)
+        if (cube) { // Top or bottom of the cube was hit
+          if (contact.ni.y > 0.5 || contact.ni.y < -0.5) {
+            playerHealthPoints -= 1
+            if (playerHealthPoints <= 0) {
+              gameOver()
+            }
+          } else {
+          }
+        } else { // Sphere collision
+          if (playerHealthPoints <= 0) {
+            gameOver()
+          }
+        }
+      })
+    }
+
+    function onKeyDown(event) {
+      switch (event.code) {
+        case 'KeyW':
+          moveForward = true
+          break
+        case 'KeyS':
+          moveBackward = true
+          break
+        case 'KeyA':
+          moveLeft = true
+          break
+        case 'KeyD':
+          moveRight = true
+          break
+        case 'Space':
+          if (!moveUp && controls.getObject().position.y <= 1.8) {
+            moveUp = true
+            playerBody.applyImpulse(new CANNON.Vec3(0, jumpSpeed * playerBody.mass, 0), playerBody.position)
+          }
+          break
       }
-      canvas {
-        display: block;
+    }
+
+    function onKeyUp(event) {
+      switch (event.code) {
+        case 'KeyW':
+          moveForward = false
+          break
+        case 'KeyS':
+          moveBackward = false
+          break
+        case 'KeyA':
+          moveLeft = false
+          break
+        case 'KeyD':
+          moveRight = false
+          break
+        case 'Space':
+          moveUp = false
+          break
       }
-    </style>
-  </head>
-  <body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://rawcdn.githack.com/mrdoob/three.js/r128/examples/js/controls/PointerLockControls.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js" integrity="sha512-avLcnGxl5mqAX/wIKERdb1gFNkOLHh2W5JNCfJm5OugpEPBz7LNXJJ3BDjjwO00AxEY1MqdNjtEmiYhKC0ld7g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script>
-let camera, scene, renderer, controls
-let moveForward = false
-let moveBackward = false
-let moveLeft = false
-let moveRight = false
-let moveUp = true
-let velocityY = 0
+    }
 
-const gravity = -9.81
-const jumpSpeed = 5
-const speed = 4
-
-let cubes = []
-const playerBox = new THREE.Box3()
-
-let world
-let playerBody
-let bullets = []
-
-init()
-animate()
-
-function init() {
-  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
-  scene = new THREE.Scene()
-  scene.background = new THREE.Color(0xffffff)
-  scene.add(new THREE.GridHelper(100, 100))
-
-  let light = new THREE.PointLight(0xffffff, 1)
-  camera.add(light)
-  scene.add(camera)
-
-  world = new CANNON.World()
-  world.gravity.set(0, gravity, 0)
-  world.broadphase = new CANNON.NaiveBroadphase()
-  world.solver.iterations = 10
-
-  createGround()
-
-  playerBody = new CANNON.Body({
-    mass: 5,
-    position: new CANNON.Vec3(0, 1.8, 0),
-    shape: new CANNON.Box(new CANNON.Vec3(0.5, 0.9, 0.5))
-  })
-  world.addBody(playerBody)
-
-  renderer = new THREE.WebGLRenderer({ antialias: true })
-  renderer.setSize(window.innerWidth, window.innerHeight)
-  document.body.appendChild(renderer.domElement)
-
-  controls = new THREE.PointerLockControls(camera, renderer.domElement)
-  document.addEventListener('click', () => controls.lock())
-  controls.addEventListener('lock', onPointerLockChange)
-  controls.addEventListener('unlock', onPointerLockChange)
-  controls.getObject().position.set(0, 1.8, 0)
-
-  document.addEventListener('keydown', onKeyDown)
-  document.addEventListener('keyup', onKeyUp)
-
-  window.addEventListener('resize', onWindowResize)
-
-  playerBody.addEventListener('collide', (e) => {
-    const contact = e.contact
-    if (contact.ni.y > 0.5) { // Top of the cube was hit
+    function onPointerLockChange() {
+      if (controls.isLocked) {
+        controls.enabled = true
+      } else {
+        controls.enabled = false
+      }
       moveUp = false
     }
-  })
-}
 
-function onKeyDown(event) {
-  switch (event.code) {
-    case 'KeyW':
-      moveForward = true
-    break
-    case 'KeyS':
-      moveBackward = true
-    break
-    case 'KeyA':
-      moveLeft = true
-    break
-    case 'KeyD':
-      moveRight = true
-    break
-    case 'Space':
-      if (!moveUp && controls.getObject().position.y <= 1.8) {
-      moveUp = true
-      playerBody.applyImpulse(new CANNON.Vec3(0, jumpSpeed * playerBody.mass, 0), playerBody.position)
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight
+      camera.updateProjectionMatrix()
+      renderer.setSize(window.innerWidth, window.innerHeight)
     }
-    break
-  }
-}
 
-function onKeyUp(event) {
-  switch (event.code) {
-    case 'KeyW':
-      moveForward = false
-    break
-    case 'KeyS':
-      moveBackward = false
-    break
-    case 'KeyA':
-      moveLeft = false
-    break
-    case 'KeyD':
-      moveRight = false
-    break
-    case 'Space':
-      moveUp = false
-    break
-  }
-}
-
-function onPointerLockChange() {
-  if (controls.isLocked) {
-    controls.enabled = true
-  } else {
-    controls.enabled = false
-  }
-  moveUp = false
-}
-
-function onWindowResize() {
-  camera.aspect = window.innerWidth / window.innerHeight
-  camera.updateProjectionMatrix()
-  renderer.setSize(window.innerWidth, window.innerHeight)
-}
-
-function createRandomCube() {
-  const size = Math.random() * 2
-  const geometry = new THREE.BoxGeometry(size, size, size)
-  const color = new THREE.Color(Math.random(), Math.random(), Math.random())
-  const material = new THREE.MeshLambertMaterial({ color })
-  const cube = new THREE.Mesh(geometry, material)
-
-  cube.position.set(
-    (Math.random() - 0.5) * 100,
-    size / 2,
-    (Math.random() - 0.5) * 100
-  )
-
-  // cubes.push(cube)
-  const cubeShape = new CANNON.Box(new CANNON.Vec3(size / 2, size / 2, size / 2))
-  const cubeBody = new CANNON.Body({
-    mass: 0,
-    shape: cubeShape,
-    position: new CANNON.Vec3(cube.position.x, cube.position.y, cube.position.z)
-  })
-  world.addBody(cubeBody)
-  cubes.push({ mesh: cube, body: cubeBody })
-  return cube
-}
-
-function randomCubeManagement() {
-  if (Math.random() < 0.05) {
-    const cube = createRandomCube()
-    scene.add(cube)
-  }
-}
-
-function createRandomSphere() {
-  const radius = Math.random() * 1
-  const geometry = new THREE.SphereGeometry(radius, 32, 32)
-  const color = new THREE.Color(Math.random(), Math.random(), Math.random())
-  const material = new THREE.MeshLambertMaterial({ color })
-  const sphere = new THREE.Mesh(geometry, material)
-
-  sphere.position.set(
-    (Math.random() - 0.5) * 100,
-    radius,
-    (Math.random() - 0.5) * 100
-  )
-
-  const sphereShape = new CANNON.Sphere(radius)
-  const sphereBody = new CANNON.Body({
-    mass: 0,
-    shape: sphereShape,
-    position: new CANNON.Vec3(sphere.position.x, sphere.position.y, sphere.position.z)
-  })
-  world.addBody(sphereBody)
-  cubes.push({ mesh: sphere, body: sphereBody })
-  return sphere
-}
-
-function randomSphereManagement() {
-  if (Math.random() < 0.05) {
-    const sphere = createRandomSphere()
-    scene.add(sphere)
-  }
-}
-
-function moveSpheresRandomly() {
-  cubes.forEach((cubeObj) => {
-    const randomDirection = new CANNON.Vec3(
-      (Math.random() - 0.5) * 0.1,
-      (Math.random() - 0.5) * 0.1,
-      (Math.random() - 0.5) * 0.1
-    )
-    cubeObj.body.applyImpulse(randomDirection, cubeObj.body.position)
-  })
-}
-
-randomCubeManagement()
-
-function createGround() {
-  const groundShape = new CANNON.Plane()
-  const groundBody = new CANNON.Body({ mass: 0, shape: groundShape })
-  groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2)
-  world.addBody(groundBody)
-}
-
-function shoot() {
-  const radius = 0.1
-  const speed = 50
-  const bulletGeometry = new THREE.SphereGeometry(radius)
-  const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 })
-  const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial)
-  bullet.position.copy(controls.getObject().position)
-  scene.add(bullet)
-
-  const bulletShape = new CANNON.Sphere(radius)
-  const bulletBody = new CANNON.Body({
-    mass: 1,
-    shape: bulletShape,
-    position: new CANNON.Vec3(bullet.position.x, bullet.position.y, bullet.position.z)
-  })
-  const direction = controls.getDirection(new THREE.Vector3()).normalize()
-  bulletBody.velocity.set(direction.x * speed, direction.y * speed, direction.z * speed)
-  world.addBody(bulletBody)
-  bullets.push({ mesh: bullet, body: bulletBody })
-
-  bulletBody.addEventListener('collide', (e) => {
-    const cube = cubes.find((cubeObj) => cubeObj.body.id === e.body.id)
-    if (cube) {
-      scene.remove(cube.mesh)
-      world.remove(cube.body)
-      cubes = cubes.filter((c) => c !== cube)
-      cube.mesh.geometry.dispose()
-      cube.mesh.material.dispose()
+    function createRandomCube() {
+      const size = Math.random() * 2
+      const geometry = new THREE.BoxGeometry(size, size, size)
+      const color = new THREE.Color(Math.random(), Math.random(), Math.random())
+      const material = new THREE.MeshLambertMaterial({ color })
+      const cube = new THREE.Mesh(geometry, material)
+      cube.position.set(
+        (Math.random() - 0.5) * 100,
+        size / 2,
+        (Math.random() - 0.5) * 100
+      )
+      // cubes.push(cube)
+      const cubeShape = new CANNON.Box(new CANNON.Vec3(size / 2, size / 2, size / 2))
+      const cubeBody = new CANNON.Body({
+        mass: 0,
+        shape: cubeShape,
+        position: new CANNON.Vec3(cube.position.x, cube.position.y, cube.position.z)
+      })
+      world.addBody(cubeBody)
+      cubes.push({ mesh: cube, body: cubeBody })
+      return cube
     }
-    scene.remove(bullet)
-    world.remove(bulletBody)
-    bullets = bullets.filter((b) => b !== bullet)
-    bullet.geometry.dispose()
-    bullet.material.dispose()
-  })
-}
 
-document.addEventListener('mousedown', (e) => {
-  if (e.button === 0 && controls.isLocked) {
-    shoot()
-  }
-})
-
-function animate() {
-  requestAnimationFrame(animate)
-
-  let velocity = new THREE.Vector3()
-  let direction = new THREE.Vector3()
-  // let speed = 0.1
-  if (moveBackward) velocity.z -= speed
-  if (moveForward) velocity.z += speed
-  if (moveRight) velocity.x -= speed
-  if (moveLeft) velocity.x += speed
-
-  if (moveUp) {
-    velocityY += gravity
-  } else if (controls.getObject().position.y > 1.8) {
-    velocityY = Math.max(velocityY + gravity, -jumpSpeed)
-  } else {
-    velocityY = 0
-    controls.getObject().position.y = 1.8 // Ensure the player stays on the ground
-  }
-
-  const positionChange = new THREE.Vector3(velocity.x, velocityY, velocity.z)
-  const verticalChange = new THREE.Vector3(0, velocityY, 0)
-
-  if (controls.isLocked) {
-    const playerDirection = controls.getDirection(direction).normalize()
-    const sideDirection = new THREE.Vector3(-playerDirection.z, 0, playerDirection.x).normalize()
-
-    playerBody.velocity.x = 0
-    playerBody.velocity.z = 0
-    
-    if (moveForward) {
-      playerBody.velocity.x += playerDirection.x * speed
-      playerBody.velocity.z += playerDirection.z * speed
+    function randomCubeManagement() {
+      if (Math.random() < 0.05) {
+        const cube = createRandomCube()
+        scene.add(cube)
+      }
     }
-    if (moveBackward) {
-      playerBody.velocity.x -= playerDirection.x * speed
-      playerBody.velocity.z -= playerDirection.z * speed
+
+    function moveObjectsTowardsPlayer() {
+      const playerPosition = controls.getObject().position
+      cubes.forEach((cubeObj) => {
+        const direction = playerPosition.clone().sub(cubeObj.mesh.position).normalize()
+        cubeObj.body.applyImpulse(direction.multiplyScalar(0.01), cubeObj.body.position)
+      })
     }
-    if (moveRight) {
-      playerBody.velocity.x += sideDirection.x * speed
-      playerBody.velocity.z += sideDirection.z * speed
+
+    function createRandomSphere() {
+      const radius = Math.random() * 1
+      const geometry = new THREE.SphereGeometry(radius, 32, 32)
+      const color = new THREE.Color(Math.random(), Math.random(), Math.random())
+      const material = new THREE.MeshLambertMaterial({ color })
+      const sphere = new THREE.Mesh(geometry, material)
+      sphere.position.set(
+        (Math.random() - 0.5) * 100,
+        radius,
+        (Math.random() - 0.5) * 100
+      )
+      const sphereShape = new CANNON.Sphere(radius)
+      const sphereBody = new CANNON.Body({
+        mass: 0,
+        shape: sphereShape,
+        position: new CANNON.Vec3(sphere.position.x, sphere.position.y, sphere.position.z)
+      })
+      world.addBody(sphereBody)
+      cubes.push({ mesh: sphere, body: sphereBody })
+      return sphere
     }
-    if (moveLeft) {
-      playerBody.velocity.x -= sideDirection.x * speed
-      playerBody.velocity.z -= sideDirection.z * speed
+
+    function randomSphereManagement() {
+      if (Math.random() < 0.05) {
+        const sphere = createRandomSphere()
+        scene.add(sphere)
+      }
     }
-  }
 
-  world.step(1 / 60)
-  controls.getObject().position.copy(playerBody.position)
+    function moveSpheresRandomly() {
+      cubes.forEach((cubeObj) => {
+        const randomDirection = new CANNON.Vec3(
+          (Math.random() - 0.5) * 0.1,
+          (Math.random() - 0.5) * 0.1,
+          (Math.random() - 0.5) * 0.1
+        )
+        cubeObj.body.applyImpulse(randomDirection, cubeObj.body.position)
+      })
+    }
 
-  cubes.forEach((cubeObj) => {
-    cubeObj.mesh.position.copy(cubeObj.body.position)
-    cubeObj.mesh.quaternion.copy(cubeObj.body.quaternion)
-  })
+    function createGround() {
+      const groundShape = new CANNON.Plane()
+      const groundBody = new CANNON.Body({ mass: 0, shape: groundShape })
+      groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2)
+      world.addBody(groundBody)
+    }
 
-   bullets.forEach((bulletObj) => {
-    bulletObj.mesh.position.copy(bulletObj.body.position)
-    bulletObj.mesh.quaternion.copy(bulletObj.body.quaternion)
-  })
+    function shoot() {
+      const radius = 0.1
+      const speed = 50
+      const bulletGeometry = new THREE.SphereGeometry(radius)
+      const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 })
+      const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial)
+      bullet.position.copy(controls.getObject().position)
+      scene.add(bullet)
 
-  randomCubeManagement()
-  randomSphereManagement()
-  moveSpheresRandomly()
-  renderer.render(scene, camera)
-}
-    </script>
-  </body>
+      const bulletShape = new CANNON.Sphere(radius)
+      const bulletBody = new CANNON.Body({
+        mass: 1,
+        shape: bulletShape,
+        position: new CANNON.Vec3(bullet.position.x, bullet.position.y, bullet.position.z)
+      })
+      const direction = controls.getDirection(new THREE.Vector3()).normalize()
+      bulletBody.velocity.set(direction.x * speed, direction.y * speed, direction.z * speed)
+      world.addBody(bulletBody)
+      bullets.push({ mesh: bullet, body: bulletBody })
+
+      bulletBody.addEventListener('collide', (e) => {
+        const cube = cubes.find((cubeObj) => cubeObj.body.id === e.body.id)
+        if (cube) {
+          scene.remove(cube.mesh)
+          world.remove(cube.body)
+          cubes = cubes.filter((c) => c !== cube)
+          cube.mesh.geometry.dispose()
+          cube.mesh.material.dispose()
+        }
+        scene.remove(bullet)
+        world.remove(bulletBody)
+        bullets = bullets.filter((b) => b !== bullet)
+        bullet.geometry.dispose()
+        bullet.material.dispose()
+      })
+    }
+
+    function updateScreenTint() {
+      const tintIntensity = 1 - playerHealthPoints / 3
+      const currentTint = new THREE.Color(tintIntensity, 0, 0)
+      scene.background.lerp(currentTint, 0.1)
+    }
+
+    function gameOver() {
+      const overlay = document.createElement('div')
+      overlay.style.position = 'absolute'
+      overlay.style.top = 0
+      overlay.style.left = 0
+      overlay.style.width = '100%'
+      overlay.style.height = '100%'
+      overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.75)'
+      overlay.style.display = 'flex'
+      overlay.style.justifyContent = 'center'
+      overlay.style.alignItems = 'center'
+      overlay.style.flexDirection = 'column'
+      overlay.style.zIndex = 1000
+      document.body.appendChild(overlay)
+
+      const gameOverText = document.createElement('h1')
+      gameOverText.innerText = 'GAME OVER'
+      gameOverText.style.color = 'white'
+      gameOverText.style.marginBottom = '1rem'
+      overlay.appendChild(gameOverText)
+
+      const restartButton = document.createElement('button')
+      restartButton.innerText = 'Restart'
+      restartButton.style.padding = '0.5rem 1rem'
+      restartButton.style.fontSize = '1.25rem'
+      overlay.appendChild(restartButton)
+
+      restartButton.addEventListener('click', () => {
+        location.reload()
+      })
+    }
+
+    document.addEventListener('mousedown', (e) => {
+      if (e.button === 0 && controls.isLocked) {
+        shoot()
+      }
+    })
+
+    function animate() {
+      requestAnimationFrame(animate)
+      let velocity = new THREE.Vector3()
+      let direction = new THREE.Vector3()
+      if (moveBackward) velocity.z -= speed
+      if (moveForward) velocity.z += speed
+      if (moveRight) velocity.x -= speed
+      if (moveLeft) velocity.x += speed
+      if (moveUp) {
+        velocityY += gravity
+      } else if (controls.getObject().position.y > 1.8) {
+        velocityY = Math.max(velocityY + gravity, -jumpSpeed)
+      } else {
+        velocityY = 0
+        controls.getObject().position.y = 1.8 // stay above floor
+      }
+      const positionChange = new THREE.Vector3(velocity.x, velocityY, velocity.z)
+      const verticalChange = new THREE.Vector3(0, velocityY, 0)
+
+      if (controls.isLocked) {
+        const playerDirection = controls.getDirection(direction).normalize()
+        const sideDirection = new THREE.Vector3(-playerDirection.z, 0, playerDirection.x).normalize()
+
+        playerBody.velocity.x = 0
+        playerBody.velocity.z = 0
+
+        if (moveForward) {
+          playerBody.velocity.x += playerDirection.x * speed
+          playerBody.velocity.z += playerDirection.z * speed
+        }
+        if (moveBackward) {
+          playerBody.velocity.x -= playerDirection.x * speed
+          playerBody.velocity.z -= playerDirection.z * speed
+        }
+        if (moveRight) {
+          playerBody.velocity.x += sideDirection.x * speed
+          playerBody.velocity.z += sideDirection.z * speed
+        }
+        if (moveLeft) {
+          playerBody.velocity.x -= sideDirection.x * speed
+          playerBody.velocity.z -= sideDirection.z * speed
+        }
+      }
+      world.step(1 / 60)
+      controls.getObject().position.copy(playerBody.position)
+      cubes.forEach((cubeObj) => {
+        cubeObj.mesh.position.copy(cubeObj.body.position)
+        cubeObj.mesh.quaternion.copy(cubeObj.body.quaternion)
+      })
+      bullets.forEach((bulletObj) => {
+        bulletObj.mesh.position.copy(bulletObj.body.position)
+        bulletObj.mesh.quaternion.copy(bulletObj.body.quaternion)
+      })
+      randomCubeManagement()
+      randomSphereManagement()
+      moveSpheresRandomly()
+      updateScreenTint()
+      moveObjectsTowardsPlayer()
+      renderer.render(scene, camera)
+    }
+  </script>
+</body>
 </html>
