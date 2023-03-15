@@ -270,7 +270,9 @@
       const bulletGeometry = new THREE.SphereGeometry(radius)
       const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff })
       const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial)
-      bullet.position.copy(controls.getObject().position)
+      const bulletOffset = new THREE.Vector3(0.1, -0.3, 0)
+      let bulletStartPosition = controls.getObject().position.clone().add(bulletOffset)
+      bullet.position.copy(bulletStartPosition)
       scene.add(bullet)
       const bulletShape = new CANNON.Sphere(radius)
       const bulletBody = new CANNON.Body({
