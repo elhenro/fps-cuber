@@ -58,6 +58,7 @@
     let playerBody = createPlayerBody()
     let bullets = []
     let playerHealthPoints = 3
+    let healthDisplay
 
     // collision groups
     const playerCollisionGroup = 1
@@ -121,6 +122,20 @@
           }
         }
       })
+
+      healthDisplay = document.createElement('div')
+      healthDisplay.style.position = 'absolute'
+      healthDisplay.style.top = '10px'
+      healthDisplay.style.left = '10px'
+      healthDisplay.style.color = 'white'
+      healthDisplay.style.fontFamily = 'Arial, sans-serif'
+      healthDisplay.style.fontSize = '20px'
+      healthDisplay.style.zIndex = 100
+      document.body.appendChild(healthDisplay)
+    }
+
+    function updateHealthDisplay() {
+      healthDisplay.innerHTML = `HP: ${playerHealthPoints}`
     }
 
     function onKeyDown(event) {
@@ -354,6 +369,7 @@
 
     function animate() {
       requestAnimationFrame(animate)
+      updateHealthDisplay()
       let velocity = new THREE.Vector3()
       let direction = new THREE.Vector3()
       if (moveBackward) velocity.z -= speed
