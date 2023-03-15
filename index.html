@@ -11,9 +11,24 @@
     canvas {
       display: block;
     }
+    /* crosshair */
+    #crosshair {
+      position: fixed;
+      width: 10px;
+      height: 10px;
+      border: 1px solid white;
+      background-color: rgba(0, 0, 0, 0.5);
+      top: 50%;
+      left: 50%;
+      margin-top: -5px;
+      margin-left: -5px;
+      pointer-events: none;
+      z-index: 100;
+    }
   </style>
 </head>
 <body>
+  <div id="crosshair"></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://rawcdn.githack.com/mrdoob/three.js/r128/examples/js/controls/PointerLockControls.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"
@@ -32,13 +47,27 @@
     const jumpSpeed = 5
     const speed = 4
 
-    let cubes = []
+    let isMouseDown = false
+    let lastFireTime = 0
+    const fireInterval = 1000 / 600 * 60
+
+    let worldObjects = []
     const playerBox = new THREE.Box3()
 
     let world
-    let playerBody
+    let playerBody = createPlayerBody()
     let bullets = []
     let playerHealthPoints = 3
+
+    // collision groups
+    const playerCollisionGroup = 1
+    const bulletCollisionGroup = 2
+    const objectCollisionGroup = 4
+    const groundCollisionGroup = 8
+
+    // bullets never collide with player
+    playerBody.collisionFilterGroup = playerCollisionGroup
+    playerBody.collisionFilterMask = ~bulletCollisionGroup
 
     init()
     animate()
@@ -60,11 +89,6 @@
 
       createGround()
 
-      playerBody = new CANNON.Body({
-        mass: 5,
-        position: new CANNON.Vec3(0, 1.8, 0),
-        shape: new CANNON.Box(new CANNON.Vec3(0.5, 0.9, 0.5))
-      })
       world.addBody(playerBody)
 
       renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -82,7 +106,7 @@
 
       playerBody.addEventListener('collide', (e) => {
         const contact = e.contact
-        const cube = cubes.find((cubeObj) => cubeObj.body.id === e.body.id)
+        const cube = worldObjects.find((cubeObj) => cubeObj.body.id === e.body.id)
         if (cube) { // Top or bottom of the cube was hit
           if (contact.ni.y > 0.5 || contact.ni.y < -0.5) {
             playerHealthPoints -= 1
@@ -173,10 +197,12 @@
       const cubeBody = new CANNON.Body({
         mass: 0,
         shape: cubeShape,
-        position: new CANNON.Vec3(cube.position.x, cube.position.y, cube.position.z)
+        position: new CANNON.Vec3(cube.position.x, cube.position.y, cube.position.z),
+        collisionFilterGroup: objectCollisionGroup,
+        collisionFilterMask: ~0 // Collides with everything
       })
       world.addBody(cubeBody)
-      cubes.push({ mesh: cube, body: cubeBody })
+      worldObjects.push({ mesh: cube, body: cubeBody })
       return cube
     }
 
@@ -187,11 +213,11 @@
       }
     }
 
-    function moveObjectsTowardsPlayer() {
-      const playerPosition = controls.getObject().position
-      cubes.forEach((cubeObj) => {
-        const direction = playerPosition.clone().sub(cubeObj.mesh.position).normalize()
-        cubeObj.body.applyImpulse(direction.multiplyScalar(0.01), cubeObj.body.position)
+    function createPlayerBody() {
+      return new CANNON.Body({
+        mass: 5,
+        position: new CANNON.Vec3(0, 1.8, 0),
+        shape: new CANNON.Box(new CANNON.Vec3(0.5, 0.9, 0.5))
       })
     }
 
@@ -210,10 +236,12 @@
       const sphereBody = new CANNON.Body({
         mass: 0,
         shape: sphereShape,
-        position: new CANNON.Vec3(sphere.position.x, sphere.position.y, sphere.position.z)
+        position: new CANNON.Vec3(sphere.position.x, sphere.position.y, sphere.position.z),
+        collisionFilterGroup: objectCollisionGroup,
+        collisionFilterMask: ~0 // Collides with everything
       })
       world.addBody(sphereBody)
-      cubes.push({ mesh: sphere, body: sphereBody })
+      worldObjects.push({ mesh: sphere, body: sphereBody })
       return sphere
     }
 
@@ -224,50 +252,44 @@
       }
     }
 
-    function moveSpheresRandomly() {
-      cubes.forEach((cubeObj) => {
-        const randomDirection = new CANNON.Vec3(
-          (Math.random() - 0.5) * 0.1,
-          (Math.random() - 0.5) * 0.1,
-          (Math.random() - 0.5) * 0.1
-        )
-        cubeObj.body.applyImpulse(randomDirection, cubeObj.body.position)
-      })
-    }
-
     function createGround() {
       const groundShape = new CANNON.Plane()
-      const groundBody = new CANNON.Body({ mass: 0, shape: groundShape })
+      const groundBody = new CANNON.Body({
+        mass: 0,
+        shape: groundShape,
+        collisionFilterGroup: groundCollisionGroup,
+        collisionFilterMask: ~0 // Collides with everything
+      })
       groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2)
       world.addBody(groundBody)
     }
 
-    function shoot() {
-      const radius = 0.1
-      const speed = 50
+    function fireBullet() {
+      const radius = 0.2
+      const speed = 111
       const bulletGeometry = new THREE.SphereGeometry(radius)
-      const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 })
+      const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff })
       const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial)
       bullet.position.copy(controls.getObject().position)
       scene.add(bullet)
-
       const bulletShape = new CANNON.Sphere(radius)
       const bulletBody = new CANNON.Body({
         mass: 1,
         shape: bulletShape,
-        position: new CANNON.Vec3(bullet.position.x, bullet.position.y, bullet.position.z)
+        position: new CANNON.Vec3(bullet.position.x, bullet.position.y, bullet.position.z),
+        collisionFilterGroup: bulletCollisionGroup,
+        collisionFilterMask: objectCollisionGroup | groundCollisionGroup // Collides with cubes, spheres, and ground
       })
       const direction = controls.getDirection(new THREE.Vector3()).normalize()
       bulletBody.velocity.set(direction.x * speed, direction.y * speed, direction.z * speed)
       world.addBody(bulletBody)
       bullets.push({ mesh: bullet, body: bulletBody })
-
       bulletBody.addEventListener('collide', (e) => {
-        const cube = cubes.find((cubeObj) => cubeObj.body.id === e.body.id)
+        const cube = worldObjects.find((cubeObj) => cubeObj.body.id === e.body.id)
         if (cube) {
           scene.remove(cube.mesh)
           world.remove(cube.body)
-          cubes = cubes.filter((c) => c !== cube)
+          worldObjects = worldObjects.filter((c) => c !== cube)
           cube.mesh.geometry.dispose()
           cube.mesh.material.dispose()
         }
@@ -277,6 +299,14 @@
         bullet.geometry.dispose()
         bullet.material.dispose()
       })
+    }
+
+    function fireBulletIfNeeded() {
+      const currentTime = performance.now()
+      if (isMouseDown && currentTime - lastFireTime >= fireInterval) {
+        fireBullet()
+        lastFireTime = currentTime
+      }
     }
 
     function updateScreenTint() {
@@ -317,11 +347,8 @@
       })
     }
 
-    document.addEventListener('mousedown', (e) => {
-      if (e.button === 0 && controls.isLocked) {
-        shoot()
-      }
-    })
+    document.addEventListener('mousedown', (event) => { isMouseDown = true })
+    document.addEventListener('mouseup', (event) => { isMouseDown = false })
 
     function animate() {
       requestAnimationFrame(animate)
@@ -367,20 +394,23 @@
         }
       }
       world.step(1 / 60)
-      controls.getObject().position.copy(playerBody.position)
-      cubes.forEach((cubeObj) => {
-        cubeObj.mesh.position.copy(cubeObj.body.position)
-        cubeObj.mesh.quaternion.copy(cubeObj.body.quaternion)
+
+      worldObjects.forEach((obj) => {
+        obj.mesh.position.copy(obj.body.position)
+        obj.mesh.quaternion.copy(obj.body.quaternion)
       })
+
       bullets.forEach((bulletObj) => {
         bulletObj.mesh.position.copy(bulletObj.body.position)
         bulletObj.mesh.quaternion.copy(bulletObj.body.quaternion)
       })
+
+      controls.getObject().position.copy(playerBody.position)
+
       randomCubeManagement()
       randomSphereManagement()
-      moveSpheresRandomly()
       updateScreenTint()
-      moveObjectsTowardsPlayer()
+      fireBulletIfNeeded()
       renderer.render(scene, camera)
     }
   </script>
