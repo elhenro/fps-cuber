@@ -29,6 +29,22 @@
 </head>
 <body>
   <div id="crosshair"></div>
+  <audio id="hit-sound" preload="auto">
+    <source src="hit.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
+  <audio id="oof-sound" preload="auto">
+    <source src="oof.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
+  <audio id="jump-sound" preload="auto">
+    <source src="jump.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
+  <audio id="bling-sound" preload="auto">
+    <source src="bling.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://rawcdn.githack.com/mrdoob/three.js/r128/examples/js/controls/PointerLockControls.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"
@@ -73,7 +89,7 @@
     playerBody.collisionFilterMask = ~bulletCollisionGroup
 
     // sounds
-    const hitSound = new Audio('hit.mp3')
+    // const hitSound = new Audio('hit.mp3')
 
     init()
     animate()
@@ -116,15 +132,12 @@
         if (cube) { // Top or bottom of the cube was hit
           if (contact.ni.y > 0.5 || contact.ni.y < -0.5) {
             playerHealthPoints -= 1
+            playSound('oof')
             if (playerHealthPoints <= 0) {
               gameOver()
             }
-          } else {
-          }
-        } else { // Sphere collision
-          if (playerHealthPoints <= 0) {
-            gameOver()
-          }
+          } else { }
+        } else { // floor collision
         }
       })
 
@@ -149,12 +162,27 @@
       document.body.appendChild(scoreDisplay)
     }
 
+    function mapIntToHeartString(num) {
+      switch (num) {
+        case 3:
+          return "❤️❤️❤️"
+        case 2:
+          return "❤️❤️"
+        case 1:
+          return "❤️"
+        case 0:
+          return ""
+        default:
+          return ""
+      }
+    }
+
     function updateHealthDisplay() {
-      healthDisplay.innerHTML = `HP: ${playerHealthPoints}`
+      healthDisplay.innerHTML = mapIntToHeartString(playerHealthPoints)
     }
 
     function updateScoreDisplay() {
-      scoreDisplay.innerHTML = `Score: ${score}`
+      scoreDisplay.innerHTML = `✴️ ${score}`
     }
 
     function onKeyDown(event) {
@@ -174,6 +202,7 @@
         case 'Space':
           if (!moveUp && controls.getObject().position.y <= 1.8) {
             moveUp = true
+            playSound('jump')
             playerBody.applyImpulse(new CANNON.Vec3(0, jumpSpeed * playerBody.mass, 0), playerBody.position)
           }
           break
@@ -198,6 +227,12 @@
           moveUp = false
           break
       }
+    }
+
+    function playSound(type) {
+      const sound = document.getElementById(`${type}-sound`)
+      const clonedSound = sound.cloneNode(true)
+      clonedSound.play()
     }
 
     function onPointerLockChange() {
@@ -330,7 +365,7 @@
           cube.mesh.material.dispose()
           score += 1
           updateScoreDisplay()
-          hitSound.play()
+          playSound('hit')
         }
         scene.remove(bullet)
         world.remove(bulletBody)
