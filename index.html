@@ -97,6 +97,8 @@
     playerBody.collisionFilterGroup = playerCollisionGroup
     playerBody.collisionFilterMask = ~bulletCollisionGroup
 
+    const worldObjectsSpeed = 2.5
+
     // sounds
     const bgMusic = document.getElementById('bg-music')
 
@@ -201,6 +203,7 @@
       switch (event.code) {
         case 'KeyW':
           moveForward = true
+          bgMusic.play()
           break
         case 'KeyS':
           moveBackward = true
@@ -277,10 +280,9 @@
         size / 2,
         (Math.random() - 0.5) * 100
       )
-      // cubes.push(cube)
       const cubeShape = new CANNON.Box(new CANNON.Vec3(size / 2, size / 2, size / 2))
       const cubeBody = new CANNON.Body({
-        mass: 0,
+        mass: 0.3,
         shape: cubeShape,
         position: new CANNON.Vec3(cube.position.x, cube.position.y, cube.position.z),
         collisionFilterGroup: objectCollisionGroup,
@@ -319,7 +321,7 @@
       )
       const sphereShape = new CANNON.Sphere(radius)
       const sphereBody = new CANNON.Body({
-        mass: 0,
+        mass: 1,
         shape: sphereShape,
         position: new CANNON.Vec3(sphere.position.x, sphere.position.y, sphere.position.z),
         collisionFilterGroup: objectCollisionGroup,
@@ -347,6 +349,16 @@
       })
       groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2)
       world.addBody(groundBody)
+    }
+
+    function moveWorldOjectsTowardsPlayer() {
+      if (moveUp) return
+      const playerPosition = controls.getObject().position.clone()
+      worldObjects.forEach(obj => {
+        const objPosition = obj.body.position.clone()
+        const direction = new THREE.Vector3().subVectors(playerPosition, objPosition).normalize()
+        obj.body.applyForce(direction.multiplyScalar(worldObjectsSpeed), objPosition)
+      })
     }
 
     function fireBullet() {
@@ -383,11 +395,13 @@
           updateScoreDisplay()
           playSound('hit')
         }
-        scene.remove(bullet)
-        world.remove(bulletBody)
-        bullets = bullets.filter((b) => b !== bullet)
-        bullet.geometry.dispose()
-        bullet.material.dispose()
+        setTimeout(() => {
+          scene.remove(bullet)
+          world.remove(bulletBody)
+          bullets = bullets.filter((b) => b !== bullet)
+          bullet.geometry.dispose()
+          bullet.material.dispose()
+        }, 5000)
       })
     }
 
@@ -449,6 +463,7 @@
     document.addEventListener('mouseup', (event) => { isMouseDown = false })
 
     function animate() {
+      if (isDead) return
       requestAnimationFrame(animate)
       updateHealthDisplay()
       let velocity = new THREE.Vector3()
@@ -510,6 +525,7 @@
       randomSphereManagement()
       updateScreenTint()
       fireBulletIfNeeded()
+      moveWorldOjectsTowardsPlayer()
       renderer.render(scene, camera)
     }
   </script>
