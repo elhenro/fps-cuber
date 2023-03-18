@@ -2,4 +2,4 @@
 
 [demo](https://fps.hnr.bz)
 
-![screenshot](https://fps.hnr.bz/screenshot.png)
+![screenshot](https://raw.githubusercontent.com/elhenro/fps-cuber/main/screenshot.png)
