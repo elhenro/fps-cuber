@@ -1,31 +1,25 @@
-let camera, scene, renderer, controls
+let camera, scene, renderer, controls, overlay
 let moveForward = false
 let moveBackward = false
 let moveLeft = false
 let moveRight = false
 let moveUp = true
 let velocityY = 0
-
 const gravity = -9.81
 const jumpSpeed = 5
-const speed = 4
-
+const playerSpeed = 4
+const worldObjectsSpeed = 2.5
 let isMouseDown = false
 let lastFireTime = 0
-const fireInterval = 1000 / 600 * 60
+const fireRate = 1000 / 600 * 60
 
 let worldObjects = []
-let movingCubes = []
 const playerBox = new THREE.Box3()
 
 let world
-let playerBody = createPlayerBody()
+let playerBody
 let bullets = []
-let playerHealthPoints = 3
-let isDead = false
 let healthDisplay
-
-let score = 0
 
 // collision groups
 const playerCollisionGroup = 1
@@ -33,14 +27,11 @@ const bulletCollisionGroup = 2
 const objectCollisionGroup = 4
 const groundCollisionGroup = 8
 
-// bullets never collide with player
-playerBody.collisionFilterGroup = playerCollisionGroup
-playerBody.collisionFilterMask = ~bulletCollisionGroup
-
 let shotsFired = 0
+let score = 0
+let playerHealthPoints = 3
+let isDead = false
 let neverForget = false
-
-const worldObjectsSpeed = 2.5
 
 // sounds
 const bgMusic = document.getElementById('bg-music')
@@ -49,6 +40,16 @@ init()
 animate()
 
 function init() {
+    initializeScene()
+    initializeWorld()
+    initializePlayerBody()
+    initializeRenderer()
+    initializeControls()
+    initializeHealthDisplay()
+    initializeScoreDisplay()
+}
+
+function initializeScene() {
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
     scene = new THREE.Scene()
     scene.background = new THREE.Color(0xffffff)
@@ -57,7 +58,9 @@ function init() {
     let light = new THREE.PointLight(0xffffff, 1)
     camera.add(light)
     scene.add(camera)
+}
 
+function initializeWorld() {
     world = new CANNON.World()
     world.gravity.set(0, gravity, 0)
     world.broadphase = new CANNON.NaiveBroadphase()
@@ -66,27 +69,20 @@ function init() {
     createGround(20, 1.3)
     createFloor(-8)
     createKillingFloor(-20, -Math.PI / 2)
+}
 
-    world.addBody(playerBody)
-
-    renderer = new THREE.WebGLRenderer({ antialias: true })
-    renderer.setSize(window.innerWidth, window.innerHeight)
-    document.body.appendChild(renderer.domElement)
-
-    controls = new THREE.PointerLockControls(camera, renderer.domElement)
-    document.addEventListener('click', () => controls.lock())
-    controls.addEventListener('lock', onPointerLockChange)
-    controls.addEventListener('unlock', onPointerLockChange)
-    controls.getObject().position.set(0, 1.8, 0)
-    document.addEventListener('keydown', onKeyDown)
-    document.addEventListener('keyup', onKeyUp)
-    window.addEventListener('resize', onWindowResize)
+function initializePlayerBody() {
+    playerBody = createPlayerBody()
+    // bullets never collide with player
+    playerBody.collisionFilterGroup = playerCollisionGroup
+    playerBody.collisionFilterMask = ~bulletCollisionGroup
     playerBody.addEventListener('collide', (e) => {
         const contact = e.contact
         const cube = worldObjects.find((cubeObj) => cubeObj.body.id === e.body.id)
         if (cube) { // Top or bottom of the cube was hit
             if (contact.ni.y > 0.5 || contact.ni.y < -0.5) {
                 playerHealthPoints -= 1
+                updateHealthDisplay()
                 if (playerHealthPoints <= 0) {
                     gameOver()
                 }
@@ -101,7 +97,27 @@ function init() {
         } else { // floor collision
         }
     })
+    world.addBody(playerBody)
+}
 
+function initializeRenderer() {
+    renderer = new THREE.WebGLRenderer({ antialias: true })
+    renderer.setSize(window.innerWidth, window.innerHeight)
+    document.body.appendChild(renderer.domElement)
+}
+
+function initializeControls() {
+    controls = new THREE.PointerLockControls(camera, renderer.domElement)
+    document.addEventListener('click', () => controls.lock())
+    controls.addEventListener('lock', onPointerLockChange)
+    controls.addEventListener('unlock', onPointerLockChange)
+    controls.getObject().position.set(0, 1.8, 0)
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('keyup', onKeyUp)
+    window.addEventListener('resize', onWindowResize)
+}
+
+function initializeHealthDisplay() {
     healthDisplay = document.createElement('div')
     healthDisplay.style.position = 'absolute'
     healthDisplay.style.top = '10px'
@@ -111,7 +127,10 @@ function init() {
     healthDisplay.style.fontSize = '20px'
     healthDisplay.style.zIndex = 100
     document.body.appendChild(healthDisplay)
+    updateHealthDisplay()
+}
 
+function initializeScoreDisplay() {
     scoreDisplay = document.createElement('div')
     scoreDisplay.style.position = 'absolute'
     scoreDisplay.style.top = '10px'
@@ -140,6 +159,7 @@ function mapIntToHeartString(num) {
 
 function updateHealthDisplay() {
     healthDisplay.innerHTML = mapIntToHeartString(playerHealthPoints)
+    updateScreenTint()
 }
 
 function updateScoreDisplay() {
@@ -429,7 +449,7 @@ function fireBullet() {
 
 function fireBulletIfNeeded() {
     const currentTime = performance.now()
-    if (isMouseDown && currentTime - lastFireTime >= fireInterval) {
+    if (isMouseDown && currentTime - lastFireTime >= fireRate) {
         fireBullet()
         lastFireTime = currentTime
     }
@@ -441,14 +461,8 @@ function updateScreenTint() {
     scene.background.lerp(currentTint, 0.1)
 }
 
-function gameOver() {
-    playerHealthPoints = 0
-    updateHealthDisplay()
-    updateScreenTint()
-    if (isDead) return
-    console.log('game over')
-    playSound('oof')
-    const overlay = document.createElement('div')
+function createOverlay() {
+    overlay = document.createElement('div')
     overlay.style.position = 'absolute'
     overlay.style.top = 0
     overlay.style.left = 0
@@ -461,26 +475,26 @@ function gameOver() {
     overlay.style.flexDirection = 'column'
     overlay.style.zIndex = 1000
     document.body.appendChild(overlay)
+}
 
+function createGameOverText() {
     const gameOverText = document.createElement('h1')
     gameOverText.innerText = 'GAME OVER'
     gameOverText.style.color = 'white'
     gameOverText.style.marginBottom = '1rem'
     overlay.appendChild(gameOverText)
+}
 
+function createRestartButton() {
     const restartButton = document.createElement('button')
     restartButton.innerText = 'Restart'
     restartButton.style.padding = '0.5rem 1rem'
     restartButton.style.fontSize = '1.25rem'
     overlay.appendChild(restartButton)
+    restartButton.addEventListener('click', () => location.reload())
+}
 
-    restartButton.addEventListener('click', () => {
-        location.reload()
-        isDead = false
-        neverForget = false
-        bgMusic.play()
-    })
-
+function createGithubStarLink() {
     const githubStarLink = document.createElement('iframe')
     // githubStarLink.src = 'https://ghbtns.com/github-btn.html?user=elhenro&repo=fps-cuber&type=star&count=true'
     githubStarLink.src = 'https://ghbtns.com/github-btn.html?user=elhenro&repo=fps-cuber&type=star'
@@ -491,8 +505,20 @@ function gameOver() {
     githubStarLink.title = 'GitHub'
     githubStarLink.style.margin = '10px 10px 10px 92px'
     overlay.appendChild(githubStarLink)
+}
 
+function gameOver() {
+    playerHealthPoints = 0
+    updateHealthDisplay()
+    updateScreenTint()
     if (isDead) return
+    playSound('oof')
+
+    createOverlay()
+    createGameOverText()
+    createRestartButton()
+    createGithubStarLink()
+
     isDead = true
     playSound('dead')
     bgMusic.pause()
@@ -502,18 +528,13 @@ function gameOver() {
 document.addEventListener('mousedown', (event) => { isMouseDown = true })
 document.addEventListener('mouseup', (event) => { isMouseDown = false })
 
-function animate() {
-    if (isDead) return
-    requestAnimationFrame(animate)
-
-    updateHealthDisplay()
-
+function handleMovement() {
     let velocity = new THREE.Vector3()
     let direction = new THREE.Vector3()
-    if (moveBackward) velocity.z -= speed
-    if (moveForward) velocity.z += speed
-    if (moveRight) velocity.x -= speed
-    if (moveLeft) velocity.x += speed
+    if (moveBackward) velocity.z -= playerSpeed
+    if (moveForward) velocity.z += playerSpeed
+    if (moveRight) velocity.x -= playerSpeed
+    if (moveLeft) velocity.x += playerSpeed
     if (moveUp) {
         velocityY += gravity
     } else if (controls.getObject().position.y > 1.8) {
@@ -522,9 +543,6 @@ function animate() {
         velocityY = 0
         controls.getObject().position.y = 1.8 // stay above floor
     }
-    const positionChange = new THREE.Vector3(velocity.x, velocityY, velocity.z)
-    const verticalChange = new THREE.Vector3(0, velocityY, 0)
-
     if (controls.isLocked) {
         const playerDirection = controls.getDirection(direction).normalize()
         const sideDirection = new THREE.Vector3(-playerDirection.z, 0, playerDirection.x).normalize()
@@ -533,48 +551,45 @@ function animate() {
         playerBody.velocity.z = 0
 
         if (moveForward) {
-            playerBody.velocity.x += playerDirection.x * speed
-            playerBody.velocity.z += playerDirection.z * speed
+            playerBody.velocity.x += playerDirection.x * playerSpeed
+            playerBody.velocity.z += playerDirection.z * playerSpeed
         }
         if (moveBackward) {
-            playerBody.velocity.x -= playerDirection.x * speed
-            playerBody.velocity.z -= playerDirection.z * speed
+            playerBody.velocity.x -= playerDirection.x * playerSpeed
+            playerBody.velocity.z -= playerDirection.z * playerSpeed
         }
         if (moveRight) {
-            playerBody.velocity.x += sideDirection.x * speed
-            playerBody.velocity.z += sideDirection.z * speed
+            playerBody.velocity.x += sideDirection.x * playerSpeed
+            playerBody.velocity.z += sideDirection.z * playerSpeed
         }
         if (moveLeft) {
-            playerBody.velocity.x -= sideDirection.x * speed
-            playerBody.velocity.z -= sideDirection.z * speed
+            playerBody.velocity.x -= sideDirection.x * playerSpeed
+            playerBody.velocity.z -= sideDirection.z * playerSpeed
         }
     }
-    world.step(1 / 60)
+    controls.getObject().position.copy(playerBody.position)
+}
 
+function animateWorldObjects() {
+    world.step(1 / 60)
     worldObjects.forEach((obj) => {
         obj.mesh.position.copy(obj.body.position)
         obj.mesh.quaternion.copy(obj.body.quaternion)
     })
-
     bullets.forEach((bulletObj) => {
         bulletObj.mesh.position.copy(bulletObj.body.position)
         bulletObj.mesh.quaternion.copy(bulletObj.body.quaternion)
     })
+}
 
-    controls.getObject().position.copy(playerBody.position)
-
+function animate() {
+    if (isDead) return
+    requestAnimationFrame(animate)
+    handleMovement()
+    animateWorldObjects()
     randomCubeManagement()
     randomSphereManagement()
-    updateScreenTint()
     fireBulletIfNeeded()
     moveWorldOjectsTowardsPlayer()
-
-    movingCubes.forEach((cube) => {
-        cube.body.position.x += cube.velocity.x * deltaTime
-        cube.body.position.y += cube.velocity.y * deltaTime
-        cube.body.position.z += cube.velocity.z * deltaTime
-        cube.mesh.position.copy(cube.body.position)
-    })
-
     renderer.render(scene, camera)
 }
