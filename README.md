@@ -1,10 +1,7 @@
-# fps-cuber
+# FPS Cuber 
+Simple first person shooter game to be played in a browser. [demo](https://fps.hnr.bz)
 
-[demo](https://fps.hnr.bz)
-
-Simple first person shooter game to be played in a browser.
-
-The game is written in javascript and uses the [three.js](https://threejs.org/) and [cannon.js](https://github.com/schteppe/cannon.js) libraries.
+The game is written in javascript and uses the [three.js](https://github.com/mrdoob/three.js/) and [cannon.js](https://github.com/schteppe/cannon.js) libraries.
 
 The player can move around with WASD, shoot with Left-Click and jump with Space.
 
