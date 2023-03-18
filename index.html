@@ -544,6 +544,17 @@
         bgMusic.play()
       })
 
+      const githubStarLink = document.createElement('iframe')
+      // githubStarLink.src = 'https://ghbtns.com/github-btn.html?user=elhenro&repo=fps-cuber&type=star&count=true'
+      githubStarLink.src = 'https://ghbtns.com/github-btn.html?user=elhenro&repo=fps-cuber&type=star'
+      githubStarLink.frameBorder = 0
+      githubStarLink.scrolling = 0
+      githubStarLink.width = 150
+      githubStarLink.height = 20
+      githubStarLink.title = 'GitHub'
+      githubStarLink.style.margin = '10px 10px 10px 92px'
+      overlay.appendChild(githubStarLink)
+
       if (isDead) return
       isDead = true
       playSound('dead')
