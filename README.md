@@ -1,5 +1,3 @@
-# FPS Cuber
-
 ![screenshot](https://raw.githubusercontent.com/elhenro/fps-cuber/main/screenshot.png)
 
 - Written in JavaScript
